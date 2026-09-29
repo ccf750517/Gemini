@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中國歷史系統</title>
+    <!-- 引入 Leaflet 地圖套件的 CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- 引入 Google Fonts 中文字體 (思源宋體，增加歷史感) -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* 傳統中國風色調設定 */
+        :root {
+            --bg-rice: #f5f0e1;       /* 宣紙白 */
+            --bg-rice-darker: #e8e0cc;
+            --text-ink: #2b2b2b;      /* 墨黑 */
+            --red-cinnabar: #cc2a25;  /* 朱砂紅 */
+            --green-jade: #3b7b5b;    /* 碧玉綠 */
+            --border-color: #d1c5b4;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Noto Serif TC', serif;
+            background-color: var(--bg-rice);
+            color: var(--text-ink);
+            /* 加入極淡的宣紙紋理背景 */
+            background-image: url('data:image/svg+xml;utf8,<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg"><circle cx="2" cy="2" r="1" fill="%23d1c5b4" fill-opacity="0.2"/></svg>');
+        }
+
+        /* 導覽列與標題 */
+        header {
+            background-color: var(--bg-rice-darker);
+            padding: 15px 30px;
+            border-bottom: 3px solid var(--red-cinnabar);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        header h1 {
+            margin: 0;
+            color: var(--red-cinnabar);
+            font-size: 26px;
+            letter-spacing: 4px;
+        }
+
+        /* 搜尋列 */
+        .search-bar {
+            display: flex;
+            gap: 10px;
+        }
+
+        .search-bar input {
+            padding: 8px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-family: 'Noto Serif TC', serif;
+            background-color: #fff;
+            width: 250px;
+        }
+
+        .search-bar button {
+            padding: 8px 15px;
+            background-color: var(--text-ink);
+            color: var(--bg-rice);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Noto Serif TC', serif;
+            transition: background 0.2s;
+        }
+
+        .search-bar button:hover {
+            background-color: var(--red-cinnabar);
+        }
+
+        /* 頁籤導航 */
+        nav {
+            display: flex;
+            justify-content: center;
+            background-color: var(--text-ink);
+        }
+
+        nav button {
+            background: none;
+            border: none;
+            color: var(--bg-rice);
+            padding: 15px 40px;
+            font-size: 16px;
+            cursor: pointer;
+            font-family: 'Noto Serif TC', serif;
+            transition: background 0.3s;
+            letter-spacing: 2px;
+        }
+
+        nav button:hover, nav button.active {
+            background-color: var(--red-cinnabar);
+        }
+
+        /* 主要內容區 */
+        main {
+            padding: 30px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h2 {
+            border-left: 5px solid var(--red-cinnabar);
+            padding-left: 15px;
+            margin-bottom: 25px;
+        }
+
+        /* 第一層：地圖區塊樣式 */
+        #map {
+            width: 100%;
+            height: 600px;
+            border: 3px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            /* 加入褐色濾鏡，呈現歷史古地圖感 */
+            filter: sepia(0.4) contrast(0.9) brightness(0.95);
+        }
+
+        /* 第二層：歷史人物卡片 */
+        .figures-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 25px;
+        }
+
+        .card {
+            background-color: rgba(255, 255, 255, 0.7);
+            border: 1px solid var(--border-color);
+            padding: 20px;
+            border-radius: 4px;
+            border-top: 4px solid var(--green-jade);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card h3 {
+            margin-top: 0;
+            color: var(--text-ink);
+            border-bottom: 1px dashed var(--border-color);
+            padding-bottom: 10px;
+            font-size: 20px;
+        }
+
+        /* 第三層：歷史變革時間軸 */
+        .timeline {
+            border-left: 3px solid var(--red-cinnabar);
+            padding-left: 25px;
+            margin-left: 10px;
+        }
+
+        .timeline-item {
+            margin-bottom: 40px;
+            position: relative;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -33px;
+            top: 3px;
+            width: 13px;
+            height: 13px;
+            border-radius: 50%;
+            background-color: var(--bg-rice);
+            border: 3px solid var(--red-cinnabar);
+        }
+        
+        .timeline-date {
+            font-weight: bold;
+            color: var(--red-cinnabar);
+            font-size: 18px;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>中國歷史系統</h1>
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="搜尋朝代、據點、人物或事件...">
+            <button onclick="searchContent()">搜尋</button>
+        </div>
+    </header>
+
+    <nav>
+        <button class="active" onclick="showSection('map-section', this)">天下大勢 (地圖)</button>
+        <button onclick="showSection('figures-section', this)">風雲人物</button>
+        <button onclick="showSection('events-section', this)">歷史變革</button>
+    </nav>
+
+    <main>
+        <!-- 模塊一：地圖與勢力範圍 -->
+        <section id="map-section" class="section active">
+            <h2>朝代疆域、勢力範圍與重要據點 (當前展示：漢朝)</h2>
+            <p>包含自定義多邊形範圍（紅色區塊為漢朝粗略疆域）與標記點（重要都城）。</p>
+            <div id="map"></div>
+        </section>
+
+        <!-- 模塊二：人物介紹 -->
+        <section id="figures-section" class="section">
+            <h2>歷史人物介紹</h2>
+            <div class="figures-grid">
+                <div class="card">
+                    <h3>秦始皇 (嬴政)</h3>
+                    <p><strong>朝代：</strong>秦朝</p>
+                    <p><strong>生平：</strong>中國歷史上首位完成華夏大一統的鐵腕政治家。廢除分封制，代以郡縣制，書同文，車同軌，統一度量衡。</p>
+                </div>
+                <div class="card">
+                    <h3>漢武帝 (劉徹)</h3>
+                    <p><strong>朝代：</strong>西漢</p>
+                    <p><strong>生平：</strong>開疆拓土，擊潰匈奴，奠定漢地範圍。罷黜百家，獨尊儒術，設立太學，開闢絲綢之路。</p>
+                </div>
+                <div class="card">
+                    <h3>諸葛亮</h3>
+                    <p><strong>朝代：</strong>三國 (蜀漢)</p>
+                    <p><strong>生平：</strong>傑出的政治家、軍事家、發明家。輔佐劉備建立蜀漢，鞠躬盡瘁，死而後已。</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 模塊三：變革事件 -->
+        <section id="events-section" class="section">
+            <h2>歷史變革事件</h2>
+            <div class="timeline">
+                <div class="timeline-item">
+                    <div class="timeline-date">西元前 221 年</div>
+                    <h3>秦滅六國，統一天下</h3>
+                    <p>秦國先後消滅韓、趙、魏、楚、燕、齊六國，結束了春秋戰國以來長期的諸侯割據局面，建立中國歷史上第一個中央集權的大一統帝國。</p>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-date">西元前 138 年</div>
+                    <h3>張騫出使西域</h3>
+                    <p>奉漢武帝之命，張騫出使西域，打通了漢朝通往西域的南北道路，即著名的「絲綢之路」，促進了東西方經濟文化的交流。</p>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-date">西元 208 年</div>
+                    <h3>赤壁之戰</h3>
+                    <p>孫權、劉備聯軍在長江赤壁一帶大破曹操大軍，奠定了三國鼎立的基礎。</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 引入 Leaflet 地圖套件的 JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // 頁籤切換邏輯
+        function showSection(sectionId, btn) {
+            // 隱藏所有區塊
+            document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+            // 顯示目標區塊
+            document.getElementById(sectionId).classList.add('active');
+            
+            // 更新按鈕樣式
+            document.querySelectorAll('nav button').forEach(el => el.classList.remove('active'));
+            btn.classList.add('active');
+
+            // 處理 Leaflet 地圖在隱藏切換顯示時，可能發生的灰屏或尺寸抓取錯誤
+            if(sectionId === 'map-section') {
+                setTimeout(() => { map.invalidateSize(); }, 200);
+            }
+        }
+
+        // 搜尋功能展示
+        function searchContent() {
+            const keyword = document.getElementById('searchInput').value;
+            if(keyword.trim() !== '') {
+                alert('系統正在搜尋：「' + keyword + '」\n(此為純前端介面展示，實際資料過濾需搭配資料庫或前端路由邏輯)');
+            }
+        }
+
+        // 初始化地圖，中心點設置於西安(長安)附近，縮放級別為5
+        const map = L.map('map').setView([34.3416, 108.9398], 5); 
+
+        // 載入 OpenStreetMap 開源圖資
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 18,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // 繪製漢朝勢力範圍多邊形 (此為粗略座標示意)
+        const hanDynastyBounds = [
+            [40.0, 95.0],  // 西北 (敦煌一帶)
+            [41.0, 120.0], // 東北 (遼東)
+            [30.0, 122.0], // 東南 (江浙)
+            [20.0, 110.0], // 華南 (交趾一帶)
+            [25.0, 100.0], // 西南 (雲貴)
+            [35.0, 103.0]  // 西部 (隴西)
+        ];
+
+        const hanPolygon = L.polygon(hanDynastyBounds, {
+            color: '#cc2a25',       // 朱砂紅外框
+            fillColor: '#cc2a25',   // 內部填充色
+            fillOpacity: 0.15,      // 透明度
+            weight: 2               // 邊框粗細
+        }).addTo(map);
+        hanPolygon.bindPopup("<b>漢朝 (西漢) 疆域示意圖</b><br>此為程式自動繪製之粗略範圍，隨歷史發展有所變更。");
+
+        // 定義重要據點座標與資訊
+        const strongholds = [
+            { name: "長安 (西漢都城)", coords: [34.2658, 108.9541], desc: "西漢的政治、經濟與文化中心，絲綢之路起點。" },
+            { name: "洛陽 (東漢都城)", coords: [34.6191, 112.4530], desc: "東漢定都於此，地處中原核心，有「九朝古都」之稱。" },
+            { name: "建業 (三國東吳)", coords: [32.0603, 118.7969], desc: "今南京，憑藉長江天險，為東吳都城與六朝古都起點。" },
+            { name: "成都 (三國蜀漢)", coords: [30.5728, 104.0668], desc: "天府之國，劉備據此建立蜀漢。" }
+        ];
+
+        // 批次將據點標記至地圖上
+        strongholds.forEach(site => {
+            const marker = L.marker(site.coords).addTo(map);
+            marker.bindPopup(`<b>${site.name}</b><br>${site.desc}`);
+        });
+    </script>
+</body>
+</html>
